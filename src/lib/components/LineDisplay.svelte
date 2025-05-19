@@ -1,59 +1,61 @@
 <script lang="ts">
   export let originalLineText: string = '';
-  export let maskLevel: number = 0; // 0 = all visible
-  export let revealed: boolean = false;
+  // 'masked': show with partial masking (e.g., "An_ sorr_")
+  // 'revealed': show full line text
+  export let displayState: 'masked' | 'revealed' | 'placeholder' = 'revealed';
+  export let isContextPrevious: boolean = false; // For styling the previous line
+  export let isCurrentActive: boolean = false; // For styling the current line being reviewed
 
-  $: words = originalLineText.split(/\s+/).filter(w => w.length > 0);
-  $: numWordsToHide = maskLevel;
-  $: numTotalWords = words.length;
-
-  // Ensure numWordsToHide doesn't exceed available words to hide
-  $: actualWordsToHide = Math.min(numWordsToHide, numTotalWords > 0 ? numTotalWords -1 : 0);
-
-  $: displayedWords = words.map((word, index) => {
-    // Hide from the end. If maskLevel is 1, last word is hidden.
-    // If (numTotalWords - 1 - index) < actualWordsToHide, then this word should be hidden.
-    if (revealed && index >= numTotalWords - actualWordsToHide && numTotalWords > 0) {
-      return '_'.repeat(word.length); // Replace with underscores
+  $: displayText = (() => {
+    if (!originalLineText) return '...'; // Placeholder for empty lines if they exist
+    if (displayState === 'revealed' || displayState === 'placeholder') {
+      return originalLineText;
     }
-    return word;
-  });
-
-  $: displayText = displayedWords.join(' ');
+    // displayState === 'masked'
+    return originalLineText
+      .split(/\s+/)
+      .map(word => {
+        if (word.length === 0) return '';
+        // Keep very short words (1-2 letters) fully visible, or words that are just punctuation
+        if (word.length <= 2 || !/[a-zA-Z]/.test(word)) return word;
+        return word.slice(0, -1) + '_';
+      })
+      .join(' ');
+  })();
 </script>
 
-<div class="line-display" class:revealed>
-  {#if !revealed}
-    <p class="placeholder">(Line hidden - click "Show Line")</p>
-  {:else if originalLineText}
-    <p>{@html displayText}</p>
+<p
+  class="line-content"
+  class:context-previous={isContextPrevious}
+  class:current-active={isCurrentActive && displayState !== 'placeholder'}
+  class:placeholder-text={displayState === 'placeholder'}
+>
+  {#if displayState === 'placeholder'}
   {:else}
-    <p>Error: No line text.</p>
+    {@html displayText}
   {/if}
-</div>
+</p>
 
 <style>
-  .line-display {
-    padding: 1em;
-    border: 1px solid #eee;
-    background-color: #f9f9f9;
-    min-height: 3em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .line-content {
+    margin: 0.1em 0; /* Tighter line spacing */
+    padding: 0.4em 0.6em;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 1.15em; /* Slightly larger for readability */
+    line-height: 1.5;
+    min-height: 1.5em; /* Ensure consistent height */
+    border-radius: 3px;
+    transition: background-color 0.3s ease;
+  }
+  .context-previous {
+    background-color: #fff0f0; /* Light pink/beige for previous line */
+  }
+  .current-active {
+    background-color: #e9ecef; /* Light gray for current line */
+  }
+  .placeholder-text {
+    color: #adb5bd;
     text-align: center;
-    margin-bottom: 1rem;
-    font-size: 1.2em; /* Make text a bit larger for readability */
-  }
-  .line-display.revealed {
-     /* background-color: #e9f5ff; */
-  }
-  .placeholder {
-    color: #888;
     font-style: italic;
-  }
-  p {
-    margin: 0;
-    white-space: pre-wrap; /* Preserve line breaks if any within a line, though unlikely */
   }
 </style>

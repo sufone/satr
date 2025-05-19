@@ -4,9 +4,11 @@ import Dexie, { type Table } from 'dexie';
 export interface Text {
   id?: number;
   title: string;
-  content: string; // Full text content
+  author?: string; // Added author field
+  content: string;
   createdAt: Date;
   lastReviewedAt?: Date;
+  maxUnlockedLineNumber: number; // 0-indexed. Init to 0 (first line unlocked by default).
 }
 
 export interface Line {
@@ -40,8 +42,8 @@ export const db = new LineByLineDB();
 
 // --- Utility functions ---
 
-export async function addTextWithLines(title: string, fullContent: string): Promise<number | undefined> {
-  if (!title.trim() || !fullContent.trim()) {
+export async function addTextWithLines(title: string, content: string, author?: string): Promise<number | undefined> {
+  if (!title.trim() || !content.trim()) {
     alert('Title and content cannot be empty.');
     return;
   }
@@ -50,8 +52,10 @@ export async function addTextWithLines(title: string, fullContent: string): Prom
     const textId = await db.transaction('rw', db.texts, db.lines, async () => {
       const newTextId = await db.texts.add({
         title,
+        author: author?.trim() || undefined, // Store author if provided
         content: fullContent,
         createdAt: new Date(),
+        maxUnlockedLineNumber: 0, // First line is unlocked by default
       });
 
       const linesArray = fullContent.split('\n').filter(line => line.trim() !== '');
@@ -59,17 +63,19 @@ export async function addTextWithLines(title: string, fullContent: string): Prom
         textId: newTextId as number,
         lineNumber: index,
         originalLineText: lineText,
-        nextReviewDate: new Date(), // Review immediately
-        interval: 0, // Or 1 day for the first interval after first success
-        easeFactor: 2.5, // Default ease factor
+        nextReviewDate: new Date(), // All lines initially due for first review when "unlocked"
+        interval: 0,
+        easeFactor: 2.5,
         repetitions: 0,
         lapses: 0,
-        maskLevel: 0, // All words visible initially
+        maskLevel: 0, // We'll use a new masking strategy, but keep this for now or adapt
+        lastReviewedAt: undefined, // Not reviewed yet
       }));
 
       await db.lines.bulkAdd(initialLines as Line[]);
       return newTextId;
     });
+    console.log("Text added with ID:", textId);
     return textId;
   } catch (error) {
     console.error("Failed to add text and lines:", error);
@@ -118,3 +124,7 @@ export async function deleteTextAndLines(textId: number): Promise<void> {
     await db.texts.delete(textId);
   });
 }
+
+export async function updateText(id: number, changes: Partial<Omit<Text, 'id'>>) {
+  return await db.texts.update(id, changes);
+  }

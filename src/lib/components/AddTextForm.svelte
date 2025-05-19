@@ -4,6 +4,7 @@
   import { getAllTexts } from '../db';
 
   let title: string = '';
+  let author: string = ''; // Added author
   let content: string = '';
   let isLoading: boolean = false;
 
@@ -14,12 +15,14 @@
     }
     isLoading = true;
     try {
-      const newTextId = await addTextWithLines(title, content);
+      // Pass author to addTextWithLines
+      const newTextId = await addTextWithLines(title, content, author);
       if (newTextId) {
         title = '';
+        author = ''; // Clear author
         content = '';
         alert('Text added successfully!');
-        $textsList = await getAllTexts(); // Refresh text list
+        $textsList = await getAllTexts();
         $currentView = 'list';
       }
     } catch (error) {
@@ -39,6 +42,10 @@
       <input type="text" id="title" bind:value={title} required />
     </div>
     <div>
+      <label for="author">Author (Optional):</label>
+      <input type="text" id="author" bind:value={author} />
+    </div>
+    <div>
       <label for="content">Content (one line per... line):</label>
       <textarea id="content" bind:value={content} rows="10" required></textarea>
     </div>
@@ -47,6 +54,7 @@
     </button>
   </form>
 </div>
+
 
 <style>
   .form-container {
